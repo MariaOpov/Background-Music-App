@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ui/home_screen.dart';
+import 'ui/main_screen.dart';
 
 void main() {
   runApp(const BackgroundMusicApp());
@@ -17,7 +18,8 @@ class BackgroundMusicApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const HomeScreen(),
+      // home: const HomeScreen(),
+      home: const MainScreen(),
     );
   }
 }

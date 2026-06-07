@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
-// Just_audio dùng để phát nhạc
+import '../services/audio_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,18 +11,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _selectedFilePath;
-
-  // Khởi tạo phát nhạc
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-
-  @override
-  void dispose() {
-    // Luôn nhớ giải phóng bộ nhớ khi tắt màn hình
-    _audioPlayer.dispose();
-    super.dispose();
-  }
+  final AudioManager _audioManager = AudioManager();
 
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.pickFiles(
@@ -32,34 +21,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (result != null) {
       String path = result.files.single.path!;
-
-      // Nạp file nhạc vào audioplayer ngay khi chọn xong
-      await _audioPlayer.setFilePath(path);
-
-      setState(() {
-        _selectedFilePath = path;
-        // Reset trạng thái về chưa phát
-        _isPlaying = false;
-      });
-      print("Đã nạp nhạc: $_selectedFilePath");
+      await _audioManager.player.setFilePath(path);
+      _audioManager.currentFilePath = path;
+      // Vẫn cần để cập nhật đoạn text tên bài hát
+      setState(() {});
     }
-  }
-
-  // 3. Hàm xử lý Phát/Tạm dừng
-  Future<void> _togglePlay() async {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-    } else {
-      _audioPlayer.play();
-    }
-
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    String? filePath = _audioManager.currentFilePath;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trạm Phát Nhạc Offline'),
@@ -72,8 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                _selectedFilePath != null
-                    ? 'Đang nạp file:\n${_selectedFilePath!.split('/').last}'
+                filePath != null
+                    ? 'Đang nạp file:\n${filePath.split('/').last}'
                     : 'Chưa có file nào được chọn',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14),
@@ -87,18 +59,35 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Nút bấm xịn sò tự đổi icon và text
-            FilledButton.icon(
-              onPressed: _selectedFilePath != null ? _togglePlay : null,
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-              label: Text(_isPlaying ? 'Tạm Dừng' : 'Phát Nhạc'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 12,
-                ),
-                textStyle: const TextStyle(fontSize: 18),
-              ),
+            // 💡 Dùng StreamBuilder lắng nghe trạng thái nhạc
+            StreamBuilder<PlayerState>(
+              stream: _audioManager.player.playerStateStream,
+              builder: (context, snapshot) {
+                // Lấy trạng thái playing từ stream
+                final isPlaying = snapshot.data?.playing ?? false;
+
+                return FilledButton.icon(
+                  onPressed: filePath != null
+                      ? () {
+                          // Xử lý trực tiếp logic Play/Pause ở đây
+                          if (isPlaying) {
+                            _audioManager.player.pause();
+                          } else {
+                            _audioManager.player.play();
+                          }
+                        }
+                      : null,
+                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                  label: Text(isPlaying ? 'Tạm Dừng' : 'Phát Nhạc'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                );
+              },
             ),
           ],
         ),
